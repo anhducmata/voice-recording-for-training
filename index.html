@@ -15,6 +15,7 @@
             height: 100vh;
             margin: 0;
             background-color: #f4f5f7;
+            font-weight: lighter;
         }
 
         h1 {
@@ -25,7 +26,7 @@
 
         .recorder-container {
             width: 90%;
-            max-width: 800px;
+            max-width: 60vw;
             background: #ffffff;
             border-radius: 10px;
             padding: 20px;
@@ -79,6 +80,7 @@
         }
 
         .table-container {
+            font-weight: lighter;
             max-height: 300px;
             /* Limit height of the table container */
             overflow-y: auto;
@@ -95,7 +97,7 @@
         .sentence {
             font-style: normal;
             font-size: 1.2rem;
-            color: #333;
+            color: #272b2f;
             margin: 20px 0;
             padding: 15px;
             background-color: #f9f9f9;
@@ -136,15 +138,9 @@
         }
 
         .actions-container button {
-            background-color: #6c757d;
-            padding: 8px 14px;
             font-size: 14px;
             border-radius: 6px;
             color: #fff;
-        }
-
-        .actions-container button:hover {
-            background-color: #5a6268;
         }
 
         input[type="text"] {
@@ -155,16 +151,131 @@
             color: #495057;
         }
 
-        .retry-icon {
-            margin-left: 10px;
+        .retry-icon,
+        .delete-icon {
+            margin-left: 2px;
             cursor: pointer;
-            color: #007bff;
             font-size: 16px;
         }
 
         .retry-icon:hover {
-            color: #0056b3;
+            color: #007bff; /* Blue for retry */
         }
+
+        .delete-icon:hover {
+            color: #dc3545; /* Red for delete */
+        }
+
+        /* Modal Styling */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            /* Semi-transparent background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: #ffffff;
+            /* Flat white background */
+            border-radius: 8px;
+            padding: 20px 50px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            /* Subtle shadow */
+            text-align: center;
+        }
+
+        .modal-content h2 {
+            font-size: 1.5rem;
+            color: #2c3e50;
+            margin-bottom: 15px;
+        }
+
+        .modal-content ul {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 20px 0;
+            color: #333;
+            font-size: 1rem;
+        }
+
+        .modal-content ul li {
+            margin-bottom: 10px;
+        }
+
+        .got-it-button {
+            color: #ffffff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        .got-it-button:hover {
+            background-color: #272b2f;
+            /* Darker blue on hover */
+        }
+
+        .got-it-button:active {
+            background-color: #003f7f;
+            /* Even darker blue on click */
+        }
+
+        button {
+            background-color: #495057!important;
+            padding: 5px 15px!important;
+        }
+        button:hover {
+            background-color: #272b2f!important;
+        }
+
+        .tips {
+            list-style: auto!important;
+            color: #272b2f!important;
+            font-weight: lighter;
+            text-align: start;
+            margin: 0 0 20px 0;
+            padding: 20px 50px 10px 50px!important;
+        }
+
+        table th {
+            font-weight: lighter!important;
+        }
+
+        /* Hide icons by default */
+        .icons {
+            display: none;
+        }
+
+        /* Show icons when the parent <td> is hovered */
+        #recordings tr:hover .icons {
+            display: inline-block;
+        }
+
+        /* Optional: Add spacing and alignment for icons */
+        .icons span {
+            margin-left: 8px;
+            cursor: pointer;
+        }
+
+        .record-name {
+            text-align: start;
+        }
+
+        .transcript {
+            text-align: start;
+        }
+
     </style>
     <script>
         let dataUrl = "https://raw.githubusercontent.com/anhducmata/voice-recording-for-training/refs/heads/main/transcript-for-train.txt";
@@ -284,9 +395,21 @@
                 retryIcon.title = "Retry";
                 retryIcon.onclick = () => retryRecording(transcript);
 
+                const deleteIcon = document.createElement("span");
+                deleteIcon.className = "delete-icon";
+                deleteIcon.innerHTML = "&#x1F5D1;"; // Trash bin icon
+                deleteIcon.title = "Delete";
+                deleteIcon.onclick = () => deleteRecording(transcript);
+
                 row.innerHTML = `
-                    <td>${fileName} <span class="retry-icon" title="Retry" onclick="retryRecording('${transcript}')">&#x21bb;</span></td>
-                    <td>${transcript}</td>
+                    <td class="record-name">
+                        ${fileName}
+                        <span class="icons">
+                            <span class="retry-icon" title="Retry" onclick="retryRecording('${transcript}')">🟠</span>
+                            <span class="delete-icon" title="Delete" onclick="deleteRecording('${transcript}')">❌</span>
+                        </span>
+                    </td>
+                    <td class="transcript">${transcript}</td>
                 `;
 
                 const audioCell = document.createElement("td");
@@ -298,7 +421,12 @@
             });
         }
 
-        function fetchRecordCount(){
+        function deleteRecording(transcript) {
+            delete audioStore[transcript]; // Remove the recording from the store
+            updateTable(); // Refresh the table
+        }
+
+        function fetchRecordCount() {
             const recordCount = Object.keys(audioStore).length;
             document.getElementById("file-name-header").innerText = `File Name (${recordCount} records)`;
         }
@@ -331,7 +459,7 @@
 
             const a = document.createElement("a");
             a.href = URL.createObjectURL(zipBlob);
-            a.download = "mata-recording.zip";
+            a.download = "recordings_with_mapping.zip";
             a.click();
         }
 
@@ -346,13 +474,31 @@
             document.getElementById("sentence").classList.add("sentence");
             document.getElementById("sentence").innerText = sentences[currentSentenceIndex];
         });
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const modal = document.getElementById("tips-modal");
+            const acknowledged = localStorage.getItem("recordingTipsAcknowledged");
+
+            if (!acknowledged) {
+                modal.style.display = "flex"; // Show the modal if not acknowledged
+            }
+        });
+
+        // Close the modal and save acknowledgment in localStorage
+        function closeModal() {
+            const modal = document.getElementById("tips-modal");
+            modal.style.display = "none";
+
+            // Save acknowledgment in localStorage
+            localStorage.setItem("recordingTipsAcknowledged", "true");
+        }
     </script>
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 
 <body>
     <div class="recorder-container">
-        <h1>Voice Recorder</h1>
         <p id="sentence" class="sentence"></p>
         <p id="recording-indicator" class="recording-indicator">Recording...</p>
         <button id="start-next-button" onclick="startRecording()">Start</button>
@@ -371,6 +517,20 @@
                 </thead>
                 <tbody id="recordings"></tbody>
             </table>
+        </div>
+    </div>
+    <div id="tips-modal" class="modal">
+        <div class="modal-content">
+            <h2>Recording Tips</h2>
+            <ul class="tips">
+                <li>Record in a quiet place to avoid background noise.</li>
+                <li>Ensure your microphone is properly configured and close to you.</li>
+                <li>Avoid sudden movements or noises during recording.</li>
+                <li>Speak clearly and at a consistent volume.</li>
+                <li>Disable fans, air conditioners, or other noisy equipment nearby.</li>
+                <li>Use a high-quality microphone for the best results.</li>
+            </ul>
+            <button class="got-it-button" onclick="closeModal()">Got it</button>
         </div>
     </div>
 </body>
