@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Recorder</title>
+    <style>
+        /* General Styles */
+        body {
+            font-family: 'Poppins', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f4f5f7;
+        }
+
+        h1 {
+            color: #2c3e50;
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Recorder Container */
+        .recorder-container {
+            width: 90%;
+            max-width: 800px;
+            background-color: #fff;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        /* Buttons */
+        button {
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            margin: 10px 0;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+            transform: scale(1.05);
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th, td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+
+        th {
+            background-color: #f8f9fa;
+            color: #495057;
+        }
+
+        .table-container {
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        /* Sentence Display */
+        .sentence {
+            font-size: 1.2rem;
+            color: #333;
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Recording Indicator */
+        .recording-indicator {
+            display: none;
+            color: #dc3545;
+            font-weight: bold;
+            animation: pulse 1.5s infinite;
+        }
+
+        .recording-indicator.active {
+            display: block;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        /* Actions Container */
+        .actions-container {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .actions-container button {
+            background-color: #6c757d;
+            font-size: 14px;
+            padding: 8px 14px;
+        }
+
+        .actions-container button:hover {
+            background-color: #5a6268;
+        }
+
+        /* Input Field */
+        input[type="text"] {
+            width: 90%;
+            padding: 8px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+        }
+
+        /* Retry Icon */
+        .retry-icon {
+            cursor: pointer;
+            color: #007bff;
+            font-size: 16px;
+        }
+
+        .retry-icon:hover {
+            color: #0056b3;
+        }
+    </style>
+    <script>
+        // Define key variables and initialize data
+        let dataUrl = "https://raw.githubusercontent.com/anhducmata/voice-recording-for-training/refs/heads/main/transcript-for-train.txt";
+        let sentences = [];
+        let mediaRecorder;
+        let audioChunks = [];
+        let audioStore = {};
+        let recordingCount = 0;
+        let currentSentenceIndex = 0;
+        let audioStream;
+
+        // Fetch sentences from the data source
+        async function fetchSentences() {
+            try {
+                const response = await fetch(dataUrl);
+                if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+                const data = await response.text();
+                sentences = data.split("\n").map(line => line.split("|")[1]?.trim()).filter(Boolean);
+                updateSentence();
+            } catch (error) {
+                console.error("Error fetching sentences:", error);
+                document.getElementById("sentence").innerText = "Failed to load sentences.";
+            }
+        }
+
+        // Display the current sentence
+        function updateSentence() {
+            const sentenceEl = document.getElementById("sentence");
+            if (sentences.length > currentSentenceIndex) {
+                sentenceEl.innerText = sentences[currentSentenceIndex];
+            } else {
+                sentenceEl.innerText = "All sentences recorded.";
+                document.getElementById("start-next-button").disabled = true;
+            }
+        }
+
+        // Start or stop recording
+        async function startRecording() {
+            const button = document.getElementById("start-next-button");
+            const indicator = document.getElementById("recording-indicator");
+
+            if (mediaRecorder?.state === "recording") {
+                mediaRecorder.stop();
+                button.innerText = "Next";
+                indicator.classList.remove("active");
+                audioStream.getTracks().forEach(track => track.stop());
+            } else {
+                audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(audioStream);
+
+                mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
+                mediaRecorder.onstop = saveRecording;
+
+                mediaRecorder.start();
+                button.innerText = "Stop";
+                indicator.classList.add("active");
+            }
+        }
+
+        // Save the recording
+        function saveRecording() {
+            const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+            const transcript = document.getElementById("sentence").innerText;
+            const fileName = `record-${String(++recordingCount).padStart(3, '0')}.wav`;
+
+            audioStore[transcript] = { fileName, audioBlob };
+            updateTable();
+            audioChunks = [];
+            currentSentenceIndex++;
+            updateSentence();
+        }
+
+        // Update the recordings table
+        function updateTable() {
+            const tableBody = document.getElementById("recordings");
+            tableBody.innerHTML = "";
+
+            Object.entries(audioStore).forEach(([transcript, { fileName, audioBlob }]) => {
+                const row = document.createElement("tr");
+
+                row.innerHTML = `
+                    <td>${fileName}</td>
+                    <td>${transcript}</td>
+                    <td>
+                        <audio controls>
+                            <source src="${URL.createObjectURL(audioBlob)}" type="audio/wav">
+                        </audio>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+
+            document.getElementById("file-name-header").innerText = `File Name (${recordingCount} records)`;
+        }
+
+        // Initialize app on DOM load
+        document.addEventListener("DOMContentLoaded", fetchSentences);
+    </script>
+</head>
+
+<body>
+    <div class="recorder-container">
+        <h1>Voice Recorder</h1>
+        <p id="sentence" class="sentence"></p>
+        <p id="recording-indicator" class="recording-indicator">Recording...</p>
+        <button id="start-next-button" onclick="startRecording()">Start</button>
+        <div class="actions-container">
+            <button onclick="downloadAllRecordings()">Download All</button>
+            <button onclick="deleteAllRecordings()">Delete All</button>
+        </div>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th id="file-name-header">File Name (0 records)</th>
+                        <th>Transcript</th>
+                        <th>Audio</th>
+                    </tr>
+                </thead>
+                <tbody id="recordings"></tbody>
+            </table>
+        </div>
+    </div>
+</body>
+
+</html>
