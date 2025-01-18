@@ -6,12 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Voice Recorder</title>
     <style>
-        /* General Styles */
         body {
             font-family: 'Poppins', sans-serif;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
             align-items: center;
+            justify-content: center;
             height: 100vh;
             margin: 0;
             background-color: #f4f5f7;
@@ -20,26 +20,24 @@
         h1 {
             color: #2c3e50;
             font-size: 2rem;
-            margin-bottom: 1rem;
+            margin-bottom: 20px;
         }
 
-        /* Recorder Container */
         .recorder-container {
             width: 90%;
             max-width: 800px;
-            background-color: #fff;
+            background: #ffffff;
             border-radius: 10px;
             padding: 20px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             text-align: center;
         }
 
-        /* Buttons */
         button {
             background-color: #007bff;
-            color: #fff;
+            color: white;
             border: none;
-            padding: 10px 20px;
+            padding: 10px 18px;
             margin: 10px 0;
             border-radius: 6px;
             cursor: pointer;
@@ -56,34 +54,46 @@
             transform: scale(0.95);
         }
 
-        /* Table */
         table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 20px;
+            table-layout: fixed;
         }
 
-        th, td {
-            padding: 10px;
+        th,
+        td {
             border: 1px solid #ddd;
+            padding: 10px;
             text-align: center;
+            word-wrap: break-word;
         }
 
         th {
-            background-color: #f8f9fa;
+            background-color: #e9ecef;
             color: #495057;
         }
 
-        .table-container {
-            margin-top: 20px;
-            max-height: 300px;
-            overflow-y: auto;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+        td audio {
+            max-width: 100%;
         }
 
-        /* Sentence Display */
+        .table-container {
+            max-height: 300px;
+            /* Limit height of the table container */
+            overflow-y: auto;
+            /* Enable vertical scrolling */
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            /* Add border */
+            border-radius: 4px;
+            /* Optional: Rounded corners */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            /* Optional: Shadow for better visibility */
+        }
+
         .sentence {
+            font-style: normal;
             font-size: 1.2rem;
             color: #333;
             margin: 20px 0;
@@ -93,10 +103,11 @@
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
-        /* Recording Indicator */
         .recording-indicator {
             display: none;
             color: #dc3545;
+            font-size: 1rem;
+            margin-top: 15px;
             font-weight: bold;
             animation: pulse 1.5s infinite;
         }
@@ -106,41 +117,46 @@
         }
 
         @keyframes pulse {
-            0%, 100% {
+
+            0%,
+            100% {
                 opacity: 1;
             }
+
             50% {
                 opacity: 0.5;
             }
         }
 
-        /* Actions Container */
         .actions-container {
             display: flex;
             justify-content: flex-end;
             gap: 10px;
+            margin-bottom: 10px;
         }
 
         .actions-container button {
             background-color: #6c757d;
-            font-size: 14px;
             padding: 8px 14px;
+            font-size: 14px;
+            border-radius: 6px;
+            color: #fff;
         }
 
         .actions-container button:hover {
             background-color: #5a6268;
         }
 
-        /* Input Field */
         input[type="text"] {
             width: 90%;
             padding: 8px;
             border: 1px solid #ced4da;
             border-radius: 6px;
+            color: #495057;
         }
 
-        /* Retry Icon */
         .retry-icon {
+            margin-left: 10px;
             cursor: pointer;
             color: #007bff;
             font-size: 16px;
@@ -151,57 +167,96 @@
         }
     </style>
     <script>
-        // Define key variables and initialize data
         let dataUrl = "https://raw.githubusercontent.com/anhducmata/voice-recording-for-training/refs/heads/main/transcript-for-train.txt";
-        let sentences = [];
+        let sentences = []; // Change from const to let to allow reassignment
         let mediaRecorder;
         let audioChunks = [];
-        let audioStore = {};
-        let recordingCount = 0;
+        let audioStore = {}; // Object to store recordings with transcript as key
+        let recordingCount = 0; // Counter for naming records
         let currentSentenceIndex = 0;
-        let audioStream;
+        let audioStream; // Declare globally to manage the stream
 
-        // Fetch sentences from the data source
         async function fetchSentences() {
             try {
                 const response = await fetch(dataUrl);
-                if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
                 const data = await response.text();
-                sentences = data.split("\n").map(line => line.split("|")[1]?.trim()).filter(Boolean);
-                updateSentence();
+
+                // Parse the data into the sentences array
+                sentences = data.split("\n").map(line => {
+                    const parts = line.split("|");
+                    return parts[1]?.trim(); // Only use the transcript part
+                }).filter(sentence => sentence); // Filter out empty lines
+
+                // Initialize the first sentence
+                if (sentences.length > 0) {
+                    document.getElementById("sentence").innerText = sentences[currentSentenceIndex];
+                } else {
+                    document.getElementById("sentence").innerText = "No sentences available.";
+                    document.getElementById("start-next-button").disabled = true;
+                }
             } catch (error) {
-                console.error("Error fetching sentences:", error);
-                document.getElementById("sentence").innerText = "Failed to load sentences.";
+                console.error("Failed to fetch sentences:", error);
+                document.getElementById("sentence").innerText = "Error loading sentences.";
             }
         }
 
-        // Display the current sentence
-        function updateSentence() {
-            const sentenceEl = document.getElementById("sentence");
-            if (sentences.length > currentSentenceIndex) {
-                sentenceEl.innerText = sentences[currentSentenceIndex];
-            } else {
-                sentenceEl.innerText = "All sentences recorded.";
-                document.getElementById("start-next-button").disabled = true;
-            }
-        }
+        // Initialize and fetch sentences on DOMContentLoaded
+        document.addEventListener("DOMContentLoaded", () => {
+            document.getElementById("sentence").classList.add("sentence");
+            fetchSentences(); // Fetch sentences from the URL
+        });
 
-        // Start or stop recording
         async function startRecording() {
             const button = document.getElementById("start-next-button");
             const indicator = document.getElementById("recording-indicator");
 
-            if (mediaRecorder?.state === "recording") {
+            if (mediaRecorder && mediaRecorder.state === "recording") {
                 mediaRecorder.stop();
                 button.innerText = "Next";
                 indicator.classList.remove("active");
-                audioStream.getTracks().forEach(track => track.stop());
+
+                // Stop the audio stream
+                if (audioStream) {
+                    audioStream.getTracks().forEach(track => track.stop());
+                    audioStream = null; // Clear the reference
+                }
             } else {
                 audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 mediaRecorder = new MediaRecorder(audioStream);
 
-                mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
-                mediaRecorder.onstop = saveRecording;
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+                    const transcript = document.getElementById("sentence").innerText;
+
+                    // Increment the recording count and format file name
+                    recordingCount++;
+                    const fileName = `record-${String(recordingCount).padStart(3, '0')}.wav`;
+
+                    // Store or replace the recording in the object
+                    audioStore[transcript] = {
+                        fileName,
+                        audioBlob
+                    };
+
+                    updateTable(); // Refresh the table to reflect changes
+
+                    audioChunks = [];
+
+                    if (currentSentenceIndex < sentences.length - 1) {
+                        currentSentenceIndex++;
+                        document.getElementById("sentence").innerText = sentences[currentSentenceIndex];
+                    } else {
+                        button.disabled = true;
+                        document.getElementById("sentence").innerText = "All sentences recorded.";
+                    }
+                };
 
                 mediaRecorder.start();
                 button.innerText = "Stop";
@@ -209,45 +264,90 @@
             }
         }
 
-        // Save the recording
-        function saveRecording() {
-            const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
-            const transcript = document.getElementById("sentence").innerText;
-            const fileName = `record-${String(++recordingCount).padStart(3, '0')}.wav`;
 
-            audioStore[transcript] = { fileName, audioBlob };
-            updateTable();
-            audioChunks = [];
-            currentSentenceIndex++;
-            updateSentence();
-        }
-
-        // Update the recordings table
         function updateTable() {
             const tableBody = document.getElementById("recordings");
-            tableBody.innerHTML = "";
+            tableBody.innerHTML = ""; // Clear the table
 
-            Object.entries(audioStore).forEach(([transcript, { fileName, audioBlob }]) => {
+            Object.keys(audioStore).forEach(transcript => {
+                const { fileName, audioBlob } = audioStore[transcript];
                 const row = document.createElement("tr");
 
-                row.innerHTML = `
-                    <td>${fileName}</td>
-                    <td>${transcript}</td>
-                    <td>
-                        <audio controls>
-                            <source src="${URL.createObjectURL(audioBlob)}" type="audio/wav">
-                        </audio>
-                    </td>
-                `;
-                tableBody.appendChild(row);
-            });
+                const audioElement = document.createElement("audio");
+                audioElement.controls = true;
+                audioElement.src = URL.createObjectURL(audioBlob);
+                audioElement.load();
 
-            document.getElementById("file-name-header").innerText = `File Name (${recordingCount} records)`;
+                const retryIcon = document.createElement("span");
+                retryIcon.className = "retry-icon";
+                retryIcon.innerHTML = "&#x21bb;"; // Refresh icon
+                retryIcon.title = "Retry";
+                retryIcon.onclick = () => retryRecording(transcript);
+
+                row.innerHTML = `
+                    <td>${fileName} <span class="retry-icon" title="Retry" onclick="retryRecording('${transcript}')">&#x21bb;</span></td>
+                    <td>${transcript}</td>
+                `;
+
+                const audioCell = document.createElement("td");
+                audioCell.appendChild(audioElement);
+
+                row.appendChild(audioCell);
+                tableBody.appendChild(row);
+                fetchRecordCount();
+            });
         }
 
-        // Initialize app on DOM load
-        document.addEventListener("DOMContentLoaded", fetchSentences);
+        function fetchRecordCount(){
+            const recordCount = Object.keys(audioStore).length;
+            document.getElementById("file-name-header").innerText = `File Name (${recordCount} records)`;
+        }
+
+        function retryRecording(transcript) {
+            currentSentenceIndex = sentences.findIndex(sentence => sentence === transcript);
+            if (currentSentenceIndex !== -1) {
+                document.getElementById("sentence").innerText = sentences[currentSentenceIndex];
+                document.getElementById("start-next-button").disabled = false;
+                audioChunks = []; // Clear previous chunks to avoid merging old data
+            } else {
+                alert("Error: Sentence not found for retry.");
+            }
+        }
+
+        async function downloadAllRecordings() {
+            const zip = new JSZip();
+            const folder = zip.folder("recordings");
+            let mapFileContent = "";
+
+            Object.keys(audioStore).forEach(transcript => {
+                const { fileName, audioBlob } = audioStore[transcript];
+                folder.file(fileName, audioBlob);
+                mapFileContent += `${fileName}|${transcript}\n`;
+            });
+
+            folder.file("mapping.txt", mapFileContent);
+
+            const zipBlob = await zip.generateAsync({ type: "blob" });
+
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(zipBlob);
+            a.download = "recordings_with_mapping.zip";
+            a.click();
+        }
+
+        function deleteAllRecordings() {
+            document.getElementById("recordings").innerHTML = "";
+            audioStore = {}; // Clear the store
+            recordingCount = 0; // Reset recording count
+            fetchRecordCount();
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            document.getElementById("sentence").classList.add("sentence");
+            document.getElementById("sentence").innerText = sentences[currentSentenceIndex];
+        });
     </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 
 <body>
